@@ -1,3 +1,26 @@
+> ### 🍴 This is a fork of [**ntd4996/agentpet**](https://github.com/ntd4996/agentpet)
+>
+> **All the credit for the app below belongs to [Nguyễn Thành Đạt (@ntd4996)](https://github.com/ntd4996).** He built the pet, the agent monitors, the XP/level system, the care mechanics and both the macOS and Windows clients. This fork keeps his MIT licence and copyright intact — please [star the original](https://github.com/ntd4996/agentpet) and [support him](https://ko-fi.com/ntd4996).
+>
+> **What this fork adds — pets that actually evolve.**
+> Upstream, a pet's *stage* is cosmetic: it styles a rank badge, but the artwork never changes. Here a pet can declare evolution `stages` in its `pet.json`, and the sprite it renders is chosen by the level it has reached — so it visibly transforms as you code.
+>
+> ```jsonc
+> {
+>   "id": "volt",
+>   "spritesheetPath": "stage-1.webp",     // unchanged — pets without stages work exactly as before
+>   "stages": [
+>     { "minLevel": 0,  "name": "Volt",    "spritesheetPath": "stage-1.webp" },
+>     { "minLevel": 10, "name": "Voltarc", "spritesheetPath": "stage-2.webp" }
+>   ],
+>   "attributes": { "type": "electric", "hp": 42, "atk": 61, "def": 38, "spd": 74 }
+> }
+> ```
+>
+> The extension is **backwards compatible**: an existing pet has no `stages`, gets one implicit stage, and behaves identically. It is intended to go back upstream as a PR.
+>
+> Pets are generated with [**hatch-pet-plus**](https://github.com/leduy-it/hatch-pet-plus), which emits the same `pet.json` + 8×11 spritesheet format AgentPet already reads.
+
 <div align="center">
   <img src="assets/banner.png" alt="AgentPet" width="100%" />
   <p>
