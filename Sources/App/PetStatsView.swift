@@ -40,6 +40,7 @@ struct PetStatsView: View {
         VStack(alignment: .leading, spacing: 12) {
             header(state)
             xpBlock(state)
+            evolutionBlock
             achievementBlock
             statGrid(state)
             trendBlock(state)
@@ -109,7 +110,8 @@ struct PetStatsView: View {
     private func header(_ state: PetCareState) -> some View {
         HStack(spacing: 10) {
             Group {
-                if let frame = pack?.clip(0).first {
+                // The form the pet has actually reached — not always its first.
+                if let frame = pack?.clip(0, level: level).first {
                     Image(nsImage: frame).resizable().interpolation(.none).scaledToFit().padding(4)
                 } else {
                     Image(systemName: "pawprint.fill").foregroundStyle(.secondary)
@@ -119,7 +121,8 @@ struct PetStatsView: View {
             .background(RoundedRectangle(cornerRadius: 10).fill(stageColor.opacity(0.14)))
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(imagePets.displayName(for: resolvedPetID))
+                // An evolved pet has its own name. Once Volt is Anodane, call it Anodane.
+                Text(verbatim: pack?.name(forLevel: level) ?? imagePets.displayName(for: resolvedPetID))
                     .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
                 HStack(spacing: 6) {
                     Text(verbatim: "Lv \(level)")
@@ -160,6 +163,57 @@ struct PetStatsView: View {
             Text(String(format: NSLocalizedString("≈ %@ tokens to Lv %d", comment: ""),
                         Self.tokenString(PetCare.tokensToNextLevel(state: state)), level + 1))
                 .font(.system(size: 10, weight: .medium)).foregroundStyle(stageColor.opacity(0.9))
+        }
+    }
+
+    // MARK: - Evolution
+
+    /// Type, stats, and what this pet is growing into. Shown only for pets that
+    /// declare them — every pet published before evolution existed shows nothing
+    /// here, and the card looks exactly as it always did.
+    @ViewBuilder private var evolutionBlock: some View {
+        if let pack, let attrs = pack.attributes(forLevel: level) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    if let type = attrs.type {
+                        Text(verbatim: type.uppercased())
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().fill(stageColor.opacity(0.2)))
+                            .foregroundStyle(stageColor)
+                    }
+                    Spacer()
+                    if let next = pack.nextEvolutionLevel(after: level) {
+                        Text(String(format: NSLocalizedString("Evolves at Lv %d", comment: ""), next))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                    } else if pack.evolves {
+                        Text("Fully evolved")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+                HStack(spacing: 6) {
+                    statPip("HP", attrs.hp)
+                    statPip("ATK", attrs.atk)
+                    statPip("DEF", attrs.def)
+                    statPip("SPD", attrs.spd)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func statPip(_ label: String, _ value: Int?) -> some View {
+        if let value {
+            VStack(spacing: 2) {
+                Text(verbatim: label)
+                    .font(.system(size: 8, weight: .bold)).foregroundStyle(.white.opacity(0.4))
+                Text(verbatim: "\(value)")
+                    .font(.system(size: 12, weight: .bold)).foregroundStyle(.white.opacity(0.85))
+                // 100 is a strong stat; the bar is a read-at-a-glance comparison, not a percentage.
+                ProgressView(value: Double(min(value, 100)) / 100).tint(stageColor).controlSize(.small)
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 

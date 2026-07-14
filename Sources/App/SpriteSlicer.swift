@@ -9,6 +9,8 @@ struct PetStage {
     let minLevel: Int
     let name: String?
     let clips: [[NSImage]]
+    /// Stats for this form. A pet is not just bigger when it evolves — it is stronger.
+    let attributes: PetAttributes?
 }
 
 /// A pet pack backed by a spritesheet (pet.json + image), e.g. the Codex/petdex
@@ -57,6 +59,17 @@ struct ImagePetPack: Identifiable {
     func nextEvolutionLevel(after level: Int) -> Int? {
         stages.first { $0.minLevel > level }?.minLevel
     }
+
+    /// What the pet is called in the form it has reached — so we can say
+    /// "Volt evolved into Anodane!" rather than just "Volt levelled up".
+    func name(forLevel level: Int) -> String {
+        stage(forLevel: level)?.name ?? displayName
+    }
+
+    /// Stats for the form the pet has reached, falling back to the pack's own.
+    func attributes(forLevel level: Int) -> PetAttributes? {
+        stage(forLevel: level)?.attributes ?? attributes
+    }
 }
 
 /// Battle-style attributes, shown in the stats view. Optional: a pet without
@@ -73,6 +86,7 @@ private struct StageManifest: Decodable {
     let minLevel: Int
     let name: String?
     let spritesheetPath: String
+    let attributes: PetAttributes?
 }
 
 private struct PetManifest: Decodable {
@@ -112,13 +126,15 @@ enum SpriteSlicer {
             for s in declared.sorted(by: { $0.minLevel < $1.minLevel }) {
                 guard let clips = sliceSheet(directory.appendingPathComponent(s.spritesheetPath))
                 else { continue }   // a missing stage sheet must not kill the pet
-                stages.append(PetStage(minLevel: s.minLevel, name: s.name, clips: clips))
+                stages.append(PetStage(minLevel: s.minLevel, name: s.name, clips: clips,
+                                       attributes: s.attributes ?? manifest.attributes))
             }
         }
         if stages.isEmpty {
             guard let clips = sliceSheet(directory.appendingPathComponent(manifest.spritesheetPath))
             else { return nil }
-            stages = [PetStage(minLevel: 0, name: manifest.displayName, clips: clips)]
+            stages = [PetStage(minLevel: 0, name: manifest.displayName, clips: clips,
+                               attributes: manifest.attributes)]
         }
 
         return ImagePetPack(id: manifest.id,

@@ -29,6 +29,12 @@ struct PetView: View {
     /// The pet's own XP drives which evolution stage we render.
     @ObservedObject private var care = PetCareController.shared
 
+    /// The level whose sheet is on screen. Lags `level` across an evolution so the
+    /// sheet can be swapped at the peak of the white-out rather than before it.
+    @State private var renderLevel: Int?
+    /// 0 = normal, 1 = blown out to a white silhouette.
+    @State private var flash: Double = 0
+
     var body: some View {
         content
             .frame(width: size, height: size)
@@ -41,12 +47,62 @@ struct PetView: View {
             // Upstream renders `pack.clip(clip)` — a fixed sheet, so the pet never changes.
             // Pick the sheet for the level the pet has actually reached instead.
             let level = PetCare.displayLevel(forXP: care.state(for: id).xp)
-            ImageSpriteView(frames: pack.clip(clip, level: level), mood: model.mood,
-                            fps: pet.spriteFPS(forMood: model.mood), size: size)
+
+            ZStack {
+                // The backdrop dims as the sprite blows out. Without it the white
+                // silhouette would vanish into a light desktop at exactly the moment
+                // the shape changes — which is the moment the effect exists to show.
+                Circle()
+                    .fill(RadialGradient(colors: [.white, Color(red: 0.10, green: 0.12, blue: 0.18)],
+                                         center: .center, startRadius: 0, endRadius: size * 0.7))
+                    .opacity(flash * 0.9)
+                    .blendMode(.multiply)
+
+                // `renderLevel`, not `level`: the sheet is swapped at the PEAK of the
+                // white-out, so the silhouette is seen to change. Swapping on `level`
+                // directly would show the new form first and then flash it.
+                ImageSpriteView(frames: pack.clip(clip, level: renderLevel ?? level), mood: model.mood,
+                                fps: pet.spriteFPS(forMood: model.mood), size: size)
+                    .saturation(1 - flash)
+                    .brightness(flash)
+                    .scaleEffect(1 + flash * 0.08)
+            }
+            .onAppear { renderLevel = level }
+            // Single-argument onChange: the project deploys to macOS 13.
+            .onChange(of: pack.stageIndex(forLevel: level)) { _ in
+                evolve(pack: pack, to: level)
+            }
         } else {
             Image(systemName: "pawprint.fill")
                 .font(.system(size: size * 0.4))
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Play the transformation, once, for a stage the pet has just crossed into.
+    ///
+    /// Guarded on `renderLevel` being set — that only happens in `onAppear`, which
+    /// seeds it with the level the pet ALREADY has. So relaunching the app on a
+    /// level-12 pet renders stage two immediately and silently; the effect plays
+    /// only when the stage changes while we are watching, which is exactly once per
+    /// threshold.
+    private func evolve(pack: ImagePetPack, to level: Int) {
+        guard let from = renderLevel, pack.stageIndex(forLevel: from) != pack.stageIndex(forLevel: level)
+        else { return }
+
+        let before = pack.name(forLevel: from)
+        let after = pack.name(forLevel: level)
+
+        withAnimation(.easeIn(duration: 0.45)) { flash = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            renderLevel = level                       // the swap, hidden inside the white-out
+            withAnimation(.easeOut(duration: 0.55)) { flash = 0 }
+            if before != after {
+                NotificationManager.shared.notify(
+                    title: String(format: NSLocalizedString("%@ evolved!", comment: "evolution"), before),
+                    body: String(format: NSLocalizedString("%@ evolved into %@.", comment: "evolution"),
+                                 before, after))
+            }
         }
     }
 }

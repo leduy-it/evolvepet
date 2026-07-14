@@ -141,4 +141,74 @@ final class PetEvolutionTests: XCTestCase {
         XCTAssertEqual(a.atk, 61)
         XCTAssertEqual(a.spd, 74)
     }
+
+    /// Evolving should make the pet stronger, not merely different — so stats are
+    /// per-stage, and the stats shown must be the ones for the form it has reached.
+    func testPerStageAttributesAndName() throws {
+        let pack = try makePack("""
+        {
+          "id": "volt", "displayName": "Volt", "spritesheetPath": "stage-1.png",
+          "stages": [
+            { "minLevel": 0,  "name": "Volt",    "spritesheetPath": "stage-1.png",
+              "attributes": { "type": "electric", "hp": 50, "atk": 58, "def": 46, "spd": 48 } },
+            { "minLevel": 10, "name": "Anodane", "spritesheetPath": "stage-2.png",
+              "attributes": { "type": "electric", "hp": 68, "atk": 90, "def": 62, "spd": 65 } }
+          ]
+        }
+        """, sheets: [
+            "stage-1.png": sheet(frames: 2, colour: .yellow),
+            "stage-2.png": sheet(frames: 5, colour: .blue),
+        ])
+
+        let p = try XCTUnwrap(pack)
+        XCTAssertEqual(p.attributes(forLevel: 9)?.atk, 58)
+        XCTAssertEqual(p.attributes(forLevel: 10)?.atk, 90, "the evolved form must be stronger")
+        XCTAssertEqual(p.attributes(forLevel: 10)?.type, "electric")
+
+        // This is what the notification says: "Volt evolved into Anodane!"
+        XCTAssertEqual(p.name(forLevel: 9), "Volt")
+        XCTAssertEqual(p.name(forLevel: 10), "Anodane")
+    }
+
+    /// A stage may declare no attributes of its own; it should inherit the pack's.
+    func testStageWithoutAttributesInheritsThePack() throws {
+        let pack = try makePack("""
+        {
+          "id": "x", "displayName": "X", "spritesheetPath": "s1.png",
+          "attributes": { "type": "rock", "hp": 40, "atk": 40, "def": 40, "spd": 40 },
+          "stages": [
+            { "minLevel": 0,  "spritesheetPath": "s1.png" },
+            { "minLevel": 10, "spritesheetPath": "s2.png" }
+          ]
+        }
+        """, sheets: [
+            "s1.png": sheet(frames: 2, colour: .gray),
+            "s2.png": sheet(frames: 5, colour: .brown),
+        ])
+
+        let p = try XCTUnwrap(pack)
+        XCTAssertEqual(p.attributes(forLevel: 0)?.type, "rock")
+        XCTAssertEqual(p.attributes(forLevel: 10)?.type, "rock")
+    }
+
+    /// Stage order in the file must not matter.
+    func testStagesAreSortedByLevel() throws {
+        let pack = try makePack("""
+        {
+          "id": "x", "displayName": "X", "spritesheetPath": "s2.png",
+          "stages": [
+            { "minLevel": 10, "name": "Second", "spritesheetPath": "s2.png" },
+            { "minLevel": 0,  "name": "First",  "spritesheetPath": "s1.png" }
+          ]
+        }
+        """, sheets: [
+            "s1.png": sheet(frames: 2, colour: .yellow),
+            "s2.png": sheet(frames: 5, colour: .blue),
+        ])
+
+        let p = try XCTUnwrap(pack)
+        XCTAssertEqual(p.name(forLevel: 0), "First")
+        XCTAssertEqual(p.name(forLevel: 10), "Second")
+        XCTAssertEqual(p.clip(0, level: 0).count, 2)
+    }
 }
