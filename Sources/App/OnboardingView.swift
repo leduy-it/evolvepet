@@ -73,7 +73,7 @@ struct OnboardingView: View {
                     RoundedRectangle(cornerRadius: 16).fill(.white.opacity(0.05))
                         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.systemAccent.opacity(0.3)))
                     if let pack = selectedPack {
-                        ImageSpriteView(frames: pack.clip(0), mood: .idle,
+                        ImageSpriteView(frames: pack.baseClip(0), mood: .idle,
                                         fps: pet.spriteFPS(forMood: .idle), size: 90)
                     } else {
                         Image(systemName: "pawprint.fill").font(.system(size: 40)).foregroundStyle(.white.opacity(0.3))

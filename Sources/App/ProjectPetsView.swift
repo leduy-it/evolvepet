@@ -71,6 +71,10 @@ private struct MappingRow: View {
     let mapping: ProjectPetMapping
     @ObservedObject var imagePets: ImagePetStore
     @ObservedObject var settings: ProjectPetSettings
+    @ObservedObject private var care = PetCareController.shared
+
+    /// This project's pet has its own XP, so it has its own evolution stage.
+    private var level: Int { PetCare.displayLevel(forXP: care.state(for: mapping.petID).xp) }
 
     private var folderName: String {
         (mapping.projectPath as NSString).lastPathComponent
@@ -120,7 +124,7 @@ private struct MappingRow: View {
     @ViewBuilder
     private var thumbnail: some View {
         if let pack {
-            if let frame = pack.clip(0).first {
+            if let frame = pack.clip(0, level: level).first {
                 Image(nsImage: frame)
                     .resizable()
                     .interpolation(.high)

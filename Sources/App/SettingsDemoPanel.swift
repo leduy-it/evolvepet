@@ -11,6 +11,7 @@ struct SettingsDemoPanel: View {
     @ObservedObject private var imagePets = ImagePetStore.shared
     @ObservedObject private var bubble = BubbleSettings.shared
     @ObservedObject private var bindings = PetBindingsStore.shared
+    @ObservedObject private var care = PetCareController.shared
     // Observed so editing custom messages updates the preview bubble live.
     @ObservedObject private var chat = ChatSettings.shared
     @ObservedObject private var bubbleMsgs = BubbleMessages.shared
@@ -152,7 +153,8 @@ struct SettingsDemoPanel: View {
     @ViewBuilder private var petSprite: some View {
         if let pack {
             let clip = bindings.clipIndex(packId: pack.id, clipCount: pack.clipCount, mood: mood)
-            ImageSpriteView(frames: pack.clip(clip), mood: mood,
+            let level = PetCare.displayLevel(forXP: care.state(for: pack.id).xp)
+            ImageSpriteView(frames: pack.clip(clip, level: level), mood: mood,
                             fps: pet.spriteFPS(forMood: mood),
                             size: min(max(pet.petPoint, 80), 120))
                 .environment(\.animationsEnabled, pet.animationsEnabled)

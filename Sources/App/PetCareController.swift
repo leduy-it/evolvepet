@@ -42,6 +42,24 @@ final class PetCareController: ObservableObject {
         return states[petID] ?? PetCareState()
     }
 
+    /// Which evolution stage we have already announced, per pet.
+    private var noticedStage: [String: Int] = [:]
+
+    /// Claim the right to announce that `petID` reached `stage` — true for the first
+    /// caller only.
+    ///
+    /// The evolution effect lives in `PetView`, which is per WINDOW, but XP is per PET.
+    /// One pet legitimately occupies several windows (a project mapping plus the default
+    /// window), and every one of them sees the same stage change — so without this, one
+    /// evolution posts two or three identical banners. The animation is per-window and
+    /// should play in each; only the notification is once. `@MainActor`, so the
+    /// check-and-set is race-free.
+    func claimEvolutionNotice(petID: String, stage: Int) -> Bool {
+        guard noticedStage[petID] != stage else { return false }
+        noticedStage[petID] = stage
+        return true
+    }
+
     // MARK: - Derived (selected pet)
 
     /// Level shown to the user (pet with no XP reads as Lv 0).

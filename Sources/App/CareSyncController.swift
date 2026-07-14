@@ -91,8 +91,10 @@ final class CareSyncController: ObservableObject {
     /// actual sprite — including local custom pets the site has never seen.
     /// Rendered at a generous size with nearest-neighbour scaling so the pixel
     /// art stays crisp when the web shrinks it.
-    private static func thumbDataURL(for petID: String) -> String? {
-        guard let frame = ImagePetStore.shared.pack(id: petID)?.clip(0).first else { return nil }
+    private static func thumbDataURL(for petID: String, level: Int) -> String? {
+        // The form the pet has REACHED — otherwise the web profile shows a Lv 30
+        // companion still wearing its hatchling sprite.
+        guard let frame = ImagePetStore.shared.pack(id: petID)?.clip(0, level: level).first else { return nil }
         let size = frame.size
         guard size.width > 0, size.height > 0 else { return nil }
         // Integer upscale to ~128px so the sprite is sharp at any display size.
@@ -130,7 +132,7 @@ final class CareSyncController: ObservableObject {
                 "meals": s.totalMeals,
                 "streak": s.streakDays,
                 "lastFedAt": s.lastFedAt.map { Int($0.timeIntervalSince1970) } as Any,
-                "thumb": Self.thumbDataURL(for: id) as Any,
+                "thumb": Self.thumbDataURL(for: id, level: PetCare.displayLevel(forXP: s.xp)) as Any,
                 "week": week,
                 "achievements": Array(s.unlockedAchievements ?? []).map { $0.rawValue },
             ]

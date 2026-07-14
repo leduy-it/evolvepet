@@ -32,6 +32,13 @@ struct PetView: View {
     /// The level whose sheet is on screen. Lags `level` across an evolution so the
     /// sheet can be swapped at the peak of the white-out rather than before it.
     @State private var renderLevel: Int?
+    /// Which pet `renderLevel` belongs to. A level is only meaningful for the pack it
+    /// came from, and this view is REUSED across pets — the window model's `petID` is
+    /// mutated in place rather than the view being rebuilt — so without this, pet A's
+    /// level selects pet B's stage.
+    @State private var renderPetID: String?
+    /// Invalidates an in-flight white-out when the pet changes under it.
+    @State private var evolveToken = 0
     /// 0 = normal, 1 = blown out to a white silhouette.
     @State private var flash: Double = 0
 
@@ -58,19 +65,25 @@ struct PetView: View {
                     .opacity(flash * 0.9)
                     .blendMode(.multiply)
 
-                // `renderLevel`, not `level`: the sheet is swapped at the PEAK of the
-                // white-out, so the silhouette is seen to change. Swapping on `level`
-                // directly would show the new form first and then flash it.
-                ImageSpriteView(frames: pack.clip(clip, level: renderLevel ?? level), mood: model.mood,
+                // `shown`, not `level`: the sheet is swapped at the PEAK of the white-out,
+                // so the silhouette is seen to change. Swapping on `level` directly would
+                // show the new form first and then flash it, which shows nothing. Only
+                // honoured while `renderLevel` still belongs to THIS pet.
+                ImageSpriteView(frames: pack.clip(clip, level: shown(level, for: id)), mood: model.mood,
                                 fps: pet.spriteFPS(forMood: model.mood), size: size)
                     .saturation(1 - flash)
                     .brightness(flash)
                     .scaleEffect(1 + flash * 0.08)
             }
-            .onAppear { renderLevel = level }
             // Single-argument onChange: the project deploys to macOS 13.
+            .onAppear { adopt(id: id, level: level) }
+            .onChange(of: id) { newID in
+                // The window model swaps pets in place, so this view outlives the pet it
+                // was showing. Take the new pet's stage immediately and silently.
+                adopt(id: newID, level: PetCare.displayLevel(forXP: care.state(for: newID).xp))
+            }
             .onChange(of: pack.stageIndex(forLevel: level)) { _ in
-                evolve(pack: pack, to: level)
+                evolve(pack: pack, id: id, to: level)
             }
         } else {
             Image(systemName: "pawprint.fill")
@@ -79,25 +92,56 @@ struct PetView: View {
         }
     }
 
-    /// Play the transformation, once, for a stage the pet has just crossed into.
+    /// The level whose sheet to render — the lagged one only while it still belongs to
+    /// this pet, so a swapped-in pet never inherits the previous pet's level.
+    private func shown(_ level: Int, for id: String) -> Int {
+        renderPetID == id ? (renderLevel ?? level) : level
+    }
+
+    /// Show `id` at `level` immediately, with no transformation. Used on appear and
+    /// whenever the window switches pets — neither is an evolution.
+    private func adopt(id: String, level: Int) {
+        evolveToken &+= 1        // abandon any white-out still in flight
+        renderPetID = id
+        renderLevel = level
+        flash = 0
+    }
+
+    /// Play the transformation for a stage the pet has just crossed INTO.
     ///
-    /// Guarded on `renderLevel` being set — that only happens in `onAppear`, which
-    /// seeds it with the level the pet ALREADY has. So relaunching the app on a
-    /// level-12 pet renders stage two immediately and silently; the effect plays
-    /// only when the stage changes while we are watching, which is exactly once per
-    /// threshold.
-    private func evolve(pack: ImagePetPack, to level: Int) {
-        guard let from = renderLevel, pack.stageIndex(forLevel: from) != pack.stageIndex(forLevel: level)
-        else { return }
+    /// Fires only when the stage goes UP. Any other change — selecting a different pet,
+    /// an XP reset, a pet with no care state reading as Lv 0 — is adopted silently.
+    /// Without that, choosing a fresh pet while a levelled one is on screen plays the
+    /// white-out backwards and announces "Anodane evolved into Volt".
+    ///
+    /// Relaunching the app does not replay it either: `onAppear` seeds `renderLevel`
+    /// with the level the pet ALREADY has, so a level-12 pet simply renders stage two.
+    private func evolve(pack: ImagePetPack, id: String, to level: Int) {
+        guard renderPetID == id, let from = renderLevel else { adopt(id: id, level: level); return }
+        guard pack.stageIndex(forLevel: level) > pack.stageIndex(forLevel: from) else {
+            renderLevel = level          // sideways or backwards: take it, but do not celebrate it
+            return
+        }
 
         let before = pack.name(forLevel: from)
         let after = pack.name(forLevel: level)
+        let stage = pack.stageIndex(forLevel: level)
+
+        evolveToken &+= 1
+        let token = evolveToken
 
         withAnimation(.easeIn(duration: 0.45)) { flash = 1 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            // The pet can be swapped out during the white-out. If it was, this evolution
+            // belongs to a pet we are no longer showing: drop it rather than write its
+            // level onto whatever is on screen now.
+            guard token == evolveToken, renderPetID == id else { return }
+
             renderLevel = level                       // the swap, hidden inside the white-out
             withAnimation(.easeOut(duration: 0.55)) { flash = 0 }
-            if before != after {
+
+            // Every window showing this pet plays the animation; only one announces it.
+            if before != after, care.claimEvolutionNotice(petID: id, stage: stage) {
                 NotificationManager.shared.notify(
                     title: String(format: NSLocalizedString("%@ evolved!", comment: "evolution"), before),
                     body: String(format: NSLocalizedString("%@ evolved into %@.", comment: "evolution"),

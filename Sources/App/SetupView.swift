@@ -454,6 +454,7 @@ private struct PetTab: View {
     @ObservedObject var model: SettingsModel
     let selectedPack: ImagePetPack?
     @ObservedObject private var projectSettings = ProjectPetSettings.shared
+    @ObservedObject private var care = PetCareController.shared
     @State private var browsing = false
     @State private var creating = false
     @State private var petQuery = ""
@@ -601,7 +602,8 @@ private struct PetTab: View {
         return Button { selectedSlot = slot } label: {
             VStack(spacing: 4) {
                 Group {
-                    if let petID, let pack = imagePets.pack(id: petID), let frame = pack.clip(0).first {
+                    if let petID, let pack = imagePets.pack(id: petID),
+                       let frame = pack.clip(0, level: PetCare.displayLevel(forXP: care.state(for: petID).xp)).first {
                         Image(nsImage: frame).resizable().interpolation(.high).scaledToFit()
                     } else {
                         Image(systemName: "pawprint.fill").font(.system(size: 20)).foregroundStyle(.secondary)
@@ -774,7 +776,8 @@ private struct PetTab: View {
 
     @ViewBuilder private var slotPetPreview: some View {
         if let pack = selectedSlotPack {
-            ImageSpriteView(frames: pack.clip(0), mood: .idle,
+            let level = PetCare.displayLevel(forXP: care.state(for: pack.id).xp)
+            ImageSpriteView(frames: pack.clip(0, level: level), mood: .idle,
                             fps: pet.spriteFPS(forMood: .idle), size: 78)
         } else {
             Image(systemName: "pawprint.fill").font(.system(size: 40)).foregroundStyle(.secondary)
@@ -907,7 +910,7 @@ private struct PetThumb: View {
     var body: some View {
         Button(action: select) {
             VStack(spacing: 4) {
-                StaticFrame(image: pack.clip(0).first, size: 48)
+                StaticFrame(image: pack.clip(0, level: level).first, size: 48)
                     .frame(width: 56, height: 48)
                 Text(pack.displayName).font(.caption).lineLimit(1).frame(width: 64)
             }
@@ -942,6 +945,9 @@ private struct PetThumb: View {
 
 private struct AnimationPicker: View {
     let pack: ImagePetPack
+    @ObservedObject private var care = PetCareController.shared
+    /// Bind animations against the form the pet is actually in.
+    private var level: Int { PetCare.displayLevel(forXP: care.state(for: pack.id).xp) }
     @ObservedObject private var store = PetBindingsStore.shared
     @ObservedObject private var pet = PetController.shared
     @State private var state: PetMood = .working
@@ -968,10 +974,10 @@ private struct AnimationPicker: View {
                     VStack(spacing: 3) {
                         Group {
                             if hoveredClip == i {
-                                ImageSpriteView(frames: pack.clip(i), mood: .working,
+                                ImageSpriteView(frames: pack.clip(i, level: level), mood: .working,
                                                 fps: pet.spriteFPS(forMood: .working), size: 44)
                             } else {
-                                StaticFrame(image: pack.clip(i).first, size: 44)
+                                StaticFrame(image: pack.clip(i, level: level).first, size: 44)
                             }
                         }
                         .frame(width: 54, height: 44)

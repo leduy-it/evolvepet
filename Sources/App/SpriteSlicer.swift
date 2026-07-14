@@ -32,7 +32,14 @@ struct ImagePetPack: Identifiable {
     var clips: [[NSImage]] { stages.first?.clips ?? [] }
     var clipCount: Int { clips.count }
 
-    func clip(_ index: Int) -> [NSImage] { clip(index, level: 0) }
+    /// Frames of the form the pet HATCHES as.
+    ///
+    /// Only for catalogues and pickers — surfaces where the user is choosing among
+    /// pets they may not own. Any surface showing the user's OWN pet must pass its
+    /// level, or it renders stage one forever, which is the exact bug this feature
+    /// exists to fix. The name is deliberately awkward so that reaching for it is a
+    /// decision rather than a default.
+    func baseClip(_ index: Int) -> [NSImage] { clip(index, level: 0) }
 
     /// The highest stage the pet has reached at `level`.
     func stage(forLevel level: Int) -> PetStage? {

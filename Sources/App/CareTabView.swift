@@ -34,7 +34,7 @@ struct CareTabView: View {
             Section("Companion") {
                 HStack(spacing: 14) {
                     Group {
-                        if let frame = currentPack?.clip(0).first {
+                        if let frame = currentPack?.clip(0, level: care.level).first {
                             Image(nsImage: frame).resizable().interpolation(.none).scaledToFit()
                                 .padding(5)
                         } else {
@@ -276,7 +276,7 @@ struct CareTabView: View {
         let color = Self.stageColors[min(idx, Self.stageColors.count - 1)]
         HStack(spacing: 10) {
             Group {
-                if let frame = imagePets.pack(id: id)?.clip(0).first {
+                if let frame = imagePets.pack(id: id)?.clip(0, level: lv).first {
                     Image(nsImage: frame).resizable().interpolation(.none).scaledToFit()
                 } else {
                     Image(systemName: Self.stageIcons[min(idx, Self.stageIcons.count - 1)])
