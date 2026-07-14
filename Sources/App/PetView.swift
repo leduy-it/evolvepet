@@ -26,6 +26,8 @@ struct PetView: View {
     @ObservedObject private var imagePets = ImagePetStore.shared
     @ObservedObject private var bindings = PetBindingsStore.shared
     @ObservedObject private var pet = PetController.shared
+    /// The pet's own XP drives which evolution stage we render.
+    @ObservedObject private var care = PetCareController.shared
 
     var body: some View {
         content
@@ -36,7 +38,10 @@ struct PetView: View {
     @ViewBuilder private var content: some View {
         if let id = model.petID, let pack = imagePets.pack(id: id) {
             let clip = bindings.clipIndex(packId: pack.id, clipCount: pack.clipCount, mood: model.mood)
-            ImageSpriteView(frames: pack.clip(clip), mood: model.mood,
+            // Upstream renders `pack.clip(clip)` — a fixed sheet, so the pet never changes.
+            // Pick the sheet for the level the pet has actually reached instead.
+            let level = PetCare.displayLevel(forXP: care.state(for: id).xp)
+            ImageSpriteView(frames: pack.clip(clip, level: level), mood: model.mood,
                             fps: pet.spriteFPS(forMood: model.mood), size: size)
         } else {
             Image(systemName: "pawprint.fill")
