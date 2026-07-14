@@ -9,13 +9,24 @@ ROOT="$(pwd)"
 APP="$ROOT/build/AgentPet.app"
 CONFIG="${1:-release}"
 
-# Build a universal binary (Apple Silicon + Intel) so the app runs on both.
-# Apple Silicon machines still run the native arm64 slice, unchanged.
-ARCHS=(--arch arm64 --arch x86_64)
+# A universal binary (Apple Silicon + Intel) needs Xcode's xcbuild, which ships
+# only with full Xcode — not the standalone Command Line Tools. When only the CLT
+# are present we build natively for this machine's architecture: still a valid,
+# runnable app, just with one slice. CI (full Xcode) and the notarized DMG stay
+# universal. Detect by probing for xcbuild rather than guessing from the path.
+DEVDIR="$(xcode-select -p 2>/dev/null || true)"
+if [ -n "$DEVDIR" ] && [ -x "$DEVDIR/../SharedFrameworks/XCBuild.framework/Versions/A/Support/xcbuild" ]; then
+    ARCHS=(--arch arm64 --arch x86_64)
+    echo "Building ($CONFIG, universal arm64 + x86_64)..."
+else
+    ARCHS=()
+    echo "Building ($CONFIG, native $(uname -m) — full Xcode not found, universal skipped)..."
+fi
 
-echo "Building ($CONFIG, universal arm64 + x86_64)..."
-swift build -c "$CONFIG" "${ARCHS[@]}"
-BINDIR="$(swift build -c "$CONFIG" "${ARCHS[@]}" --show-bin-path)"
+# ${ARCHS[@]+…} keeps this safe on macOS's stock bash 3.2 under `set -u` when the
+# array is empty (a bare "${ARCHS[@]}" would fault as an unbound variable there).
+swift build -c "$CONFIG" ${ARCHS[@]+"${ARCHS[@]}"}
+BINDIR="$(swift build -c "$CONFIG" ${ARCHS[@]+"${ARCHS[@]}"} --show-bin-path)"
 
 echo "Assembling $APP ..."
 rm -rf "$APP"

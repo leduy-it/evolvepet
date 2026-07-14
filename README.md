@@ -2,6 +2,8 @@
 >
 > **All the credit for the app below belongs to [Nguyễn Thành Đạt (@ntd4996)](https://github.com/ntd4996).** He built the pet, the agent monitors, the XP/level system, the care mechanics and both the macOS and Windows clients. This fork keeps his MIT licence and copyright intact — please [star the original](https://github.com/ntd4996/agentpet) and [support him](https://ko-fi.com/ntd4996).
 >
+> This fork is now developed and maintained by [**@leduy-it**](https://github.com/leduy-it), who contributes the evolution system and the zero-config buddy experience described below.
+>
 > **What this fork adds — pets that actually evolve.**
 > Upstream, a pet's *stage* is cosmetic: it styles a rank badge, but the artwork never changes. Here a pet can declare evolution `stages` in its `pet.json`, and the sprite it renders is chosen by the level it has reached — so it visibly transforms as you code.
 >
@@ -11,7 +13,7 @@
 >   "spritesheetPath": "stage-1.webp",     // unchanged — pets without stages work exactly as before
 >   "stages": [
 >     { "minLevel": 0,  "name": "Volt",    "spritesheetPath": "stage-1.webp" },
->     { "minLevel": 10, "name": "Voltarc", "spritesheetPath": "stage-2.webp" }
+>     { "minLevel": 10, "name": "Anodane", "spritesheetPath": "stage-2.webp" }
 >   ],
 >   "attributes": { "type": "electric", "hp": 42, "atk": 61, "def": 38, "spd": 74 }
 > }
@@ -168,36 +170,34 @@ Install a hook from **Settings** with one click, or wrap any command.
 
 ## Install
 
-### macOS , Homebrew
+### macOS , one command
 
 ```bash
-brew install --cask ntd4996/tap/agentpet
+curl -fsSL https://raw.githubusercontent.com/leduy-it/evolvepet/main/scripts/install.sh | bash
 ```
 
-### macOS , direct download
+Builds the app, installs it to `/Applications`, and launches it. On first run it sets up its bundled evolving pet and **auto-connects tracking for the coding agents you have** (Claude Code, Codex) , nothing else to configure. Requires the Swift toolchain (`xcode-select --install`); if you'd rather not build, use the `.dmg` below.
 
-Grab the latest `AgentPet.dmg` from [Releases](https://github.com/ntd4996/agentpet/releases/latest), open it, and drag AgentPet to Applications. Builds are Developer ID-signed and notarized by Apple, so they open without a Gatekeeper warning, and update themselves via the menu-bar **Updates** button.
+### macOS , prebuilt .dmg
 
-### Windows
-
-Download the installer or portable build from the [website](https://agentpet.thenightwatcher.online/install) or the [releases](https://github.com/ntd4996/agentpet/releases). The first launch may show a SmartScreen warning (the Windows build isn't code-signed yet); click **More info → Run anyway**. It installs per-user (no admin) and auto-updates.
+Grab the latest `AgentPet.dmg` from [Releases](https://github.com/leduy-it/evolvepet/releases/latest), open it, and drag AgentPet to Applications. No toolchain needed. (Notarized builds are published from CI once signed with an Apple Developer ID , see [`scripts/release.sh`](scripts/release.sh).)
 
 ### Build from source (macOS)
 
 ```bash
-git clone https://github.com/ntd4996/agentpet.git
-cd agentpet
-./scripts/build-app.sh release
-open build/AgentPet.app
+git clone https://github.com/leduy-it/evolvepet.git
+cd evolvepet
+./scripts/install.sh          # build + install + launch, or:
+./scripts/build-app.sh release && open build/AgentPet.app
 ```
 
-Requires Xcode 16 / Swift 6. The Windows app lives under [`windows/`](windows/) (Tauri + Rust).
+Needs Swift 6. A universal (Apple Silicon + Intel) binary needs full Xcode; with only the Command Line Tools the build falls back to a native binary for your machine. The Windows app lives under [`windows/`](windows/) (Tauri + Rust).
 
 ## Getting started
 
 1. Launch AgentPet , it lives in the menu bar.
-2. Open **Settings → General** and click **Install** next to Claude Code (or your agent), then **Enable** notifications.
-3. Run an agent. The pet reacts, and the menu-bar icon shows who is working or waiting.
+2. Nothing to set up: your evolving pet is already adopted, and tracking auto-connects for the agents you have (Claude Code, Codex). You can change either in **Settings → General**.
+3. Run an agent. The pet reacts, levels up as you work, and **transforms when it crosses an evolution threshold** , the menu-bar icon shows who is working or waiting.
 4. (Optional) Open **Settings → Care → Sign in with GitHub** to sync your companions and unlock the web profile, leaderboard and cross-device restore.
 
 ### Uninstall
@@ -229,7 +229,7 @@ Pets use the open Codex pet-pack format (`pet.json` + a spritesheet). You can:
 - **Map animations** to states, resize, rename, and customise chat lines.
 - **Make your own** and [submit it](https://agentpet.thenightwatcher.online/submit) to the community gallery.
 
-A starter pet is installed on first launch. **AgentPet bundles no pet art** , every pack is added at runtime, and each asset is owned by its submitter under their own license.
+This fork **bundles three evolving pets** (Volt, Sprocket, Pip) so a fresh install is ready to use offline , Volt is adopted by default, and each is a full evolution line that changes form as you level up. The bundled art is original and CC0. You can still browse and adopt any runtime pack from the online library exactly as before.
 
 ## Platforms
 
