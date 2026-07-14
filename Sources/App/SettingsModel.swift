@@ -113,6 +113,51 @@ final class SettingsModel: ObservableObject {
         return "\"\(path)\" hook --agent \(kind.rawValue)"
     }
 
+    /// On the very first launch, connect tracking for the coding agents the user
+    /// actually has — detected by their config *directory* existing (`~/.claude`,
+    /// `~/.codex`) — so the pet levels up as they work with zero setup. Runs once
+    /// ever (a deliberate later disconnect is never undone on the next update),
+    /// each agent isolated so one malformed settings file can't abort the rest,
+    /// and announces itself once so the config write is a friendly hand-off, not a
+    /// silent surprise.
+    func autoEnableDetectedAgentsIfNeeded() {
+        // Fresh install only. An existing user has already been through onboarding
+        // and made their own choice — including a deliberate decision NOT to
+        // connect an agent — so we must never silently reconnect them on an update.
+        // `hasOnboarded` is absent until onboarding is first dismissed, which is
+        // exactly the fresh-install window auto-connect should run in.
+        guard !UserDefaults.standard.bool(forKey: "agentpet.hasOnboarded") else { return }
+        let key = "agentpet.autoEnableHooks.done"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+
+        var connected: [String] = []
+        for kind in [AgentKind.claude, .codex] {
+            guard let spec = AgentHooks.spec(for: kind) else { continue }
+            // Detect by the config directory, NOT settingsPath: Codex's hooks.json
+            // does not exist until we write it, so it can't be the presence signal.
+            let configDir = URL(fileURLWithPath: spec.settingsPath).deletingLastPathComponent().path
+            guard FileManager.default.fileExists(atPath: configDir) else { continue }
+            guard !HookInstaller.isInstalledOnDisk(path: spec.settingsPath, events: spec.events, style: spec.style)
+            else { continue }
+            do {
+                try HookInstaller.installToDisk(command: hookCommand(for: kind), path: spec.settingsPath, events: spec.events, style: spec.style)
+                // Codex ignores our hooks.json unless its hooks feature is on.
+                if kind == .codex { try? CodexHookConfig.enableHooksOnDisk() }
+                connected.append(agents.first { $0.kind == kind }?.displayName ?? kind.rawValue.capitalized)
+            } catch {
+                // A malformed settings file for this agent: skip it, keep going.
+            }
+        }
+
+        refresh()
+        guard !connected.isEmpty else { return }
+        let names = ListFormatter.localizedString(byJoining: connected)
+        NotificationManager.shared.notify(
+            title: "Connected to \(names)",
+            body: "Your pet now levels up as you code. Disconnect anytime in Settings.")
+    }
+
     func toggleInstall(_ kind: AgentKind) {
         guard let spec = AgentHooks.spec(for: kind) else { return }
         installError = nil

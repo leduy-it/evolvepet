@@ -17,6 +17,9 @@ private let ERASE_INTERVAL: TimeInterval = 0.080
 private let TYPE_INTERVAL: TimeInterval = 0.045
 private let DOT_CYCLE_INTERVAL: TimeInterval = 0.400
 
+/// How many levels ahead of an evolution the pet gives an "almost there" nudge.
+private let EVOLUTION_HORIZON = 1
+
 /// The pet sprite alone (imported pack, reacting to mood). Shows a paw
 /// placeholder if no pet is selected yet. The pet id and mood come from the
 /// per-window model rather than the global `PetController`.
@@ -85,6 +88,9 @@ struct PetView: View {
             .onChange(of: pack.stageIndex(forLevel: level)) { _ in
                 evolve(pack: pack, id: id, to: level)
             }
+            .onChange(of: level) { newLevel in
+                nudgeHorizon(pack: pack, id: id, at: newLevel)
+            }
         } else {
             Image(systemName: "pawprint.fill")
                 .font(.system(size: size * 0.4))
@@ -148,6 +154,22 @@ struct PetView: View {
                                  before, after))
             }
         }
+    }
+
+    /// A gentle heads-up as the pet nears its next form — so the buddy feels like it's
+    /// rooting for you. Fired once per approaching threshold (deduped per pet, like the
+    /// evolution notice), never once the threshold is reached — that's `evolve`'s job.
+    /// If XP leaps clear over the horizon, the nudge is simply skipped; the evolution
+    /// itself still announces.
+    private func nudgeHorizon(pack: ImagePetPack, id: String, at level: Int) {
+        guard pack.evolves, let next = pack.nextEvolutionLevel(after: level) else { return }
+        let toGo = next - level
+        guard toGo >= 1, toGo <= EVOLUTION_HORIZON else { return }
+        guard care.claimHorizonNotice(petID: id, target: next) else { return }
+        let name = pack.name(forLevel: level)
+        NotificationManager.shared.notify(
+            title: String(format: NSLocalizedString("%@ is about to evolve", comment: "evolution horizon"), name),
+            body: NSLocalizedString("Almost there — keep coding and it'll transform.", comment: "evolution horizon"))
     }
 }
 

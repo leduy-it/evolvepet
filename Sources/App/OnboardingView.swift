@@ -104,9 +104,16 @@ struct OnboardingView: View {
 
     // Step 2: agent
     private var agentStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            stepLabel(2, "Connect an agent")
-            Text("Install a hook so AgentPet can see when an agent works, finishes, or needs you.")
+        // On a fresh install we auto-connect the agents the user already has, so
+        // by the time onboarding appears they're connected. Say so plainly here —
+        // this is the reliable disclosure (a launch-time notification is dropped
+        // before the user has granted notification permission).
+        let autoConnected = model.agents.contains { $0.isSupported && model.isInstalled($0.kind) }
+        return VStack(alignment: .leading, spacing: 12) {
+            stepLabel(2, autoConnected ? "Tracking , set up for you" : "Connect an agent")
+            Text(autoConnected
+                 ? "We connected the coding agents you have, so your pet levels up and evolves as you work. Tap any to change it."
+                 : "Install a hook so AgentPet can see when an agent works, finishes, or needs you.")
                 .font(.caption).foregroundStyle(.white.opacity(0.6))
             ForEach(model.agents) { agent in
                 HStack {

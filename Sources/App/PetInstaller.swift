@@ -199,6 +199,70 @@ enum DefaultPetBootstrap {
     }
 }
 
+/// Installs the evolving pets bundled inside the app on the first launch, so a
+/// fresh user gets a ready-to-use, auto-evolving pet with no network and no
+/// browsing. Runs once ever, and copies only pets that aren't already present —
+/// so it never clobbers a user's own pets or edits, and never re-adds a pet the
+/// user deliberately deleted.
+@MainActor
+enum BundledPetBootstrap {
+    private static let doneKey = "agentpet.bundledPetsInstalled"
+    /// The form shown on a fresh, empty first launch (the flagship evolving pet).
+    private static let defaultSelection = "volt"
+
+    static func installIfNeeded() {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: doneKey) else { return }
+
+        // `swift run` produces a bare binary with no resource bundle. There is
+        // nothing to copy from, so keep the app non-empty via the remote starter.
+        guard let bundledPets = Bundle.module.url(forResource: "pets", withExtension: nil) else {
+            DefaultPetBootstrap.installIfNeeded()
+            return
+        }
+
+        let fm = FileManager.default
+        let petsDir = URL(fileURLWithPath: AgentPetPaths.baseDir).appendingPathComponent("pets")
+        try? fm.createDirectory(at: petsDir, withIntermediateDirectories: true)
+
+        var copiedAny = false
+        let entries = (try? fm.contentsOfDirectory(at: bundledPets, includingPropertiesForKeys: nil)) ?? []
+        for src in entries {
+            // A real pet dir has a pet.json; this skips .DS_Store and other junk.
+            guard fm.fileExists(atPath: src.appendingPathComponent("pet.json").path) else { continue }
+            let dst = petsDir.appendingPathComponent(src.lastPathComponent)
+            guard !fm.fileExists(atPath: dst.path) else { continue }   // never clobber
+
+            // Stage, then atomic-rename (same as createLocalPack): an interrupted
+            // copy leaves only a dot-prefixed staging dir, never a half-populated
+            // pet dir that the never-clobber guard above would then skip forever.
+            let staging = petsDir.appendingPathComponent(".install-\(src.lastPathComponent)-\(UUID().uuidString)")
+            do {
+                try fm.copyItem(at: src, to: staging)
+                try fm.moveItem(at: staging, to: dst)
+                copiedAny = true
+            } catch {
+                try? fm.removeItem(at: staging)
+            }
+        }
+
+        if copiedAny { ImagePetStore.shared.reload() }
+
+        if PetController.shared.selectedPetID == nil {
+            let packs = ImagePetStore.shared.packs
+            PetController.shared.selectedPetID =
+                packs.contains { $0.id == defaultSelection } ? defaultSelection : packs.first?.id
+        }
+
+        // Mark done only once pets actually exist. A fully-failed first pass (disk
+        // full, permissions) then retries next launch instead of wedging the user
+        // with an empty library forever; copy-if-missing keeps the retry safe.
+        if !ImagePetStore.shared.packs.isEmpty {
+            d.set(true, forKey: doneKey)
+        }
+    }
+}
+
 /// Tolerant decode wrapper: a malformed element yields nil instead of failing.
 private struct Lenient<T: Decodable>: Decodable {
     let value: T?

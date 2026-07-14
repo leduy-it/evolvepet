@@ -38,9 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         BreakReminderController.shared.start()
         SettingsModel.shared.migrateInstalledHooksIfNeeded()
         SettingsModel.shared.repairStaleHookPathsIfNeeded()
+        SettingsModel.shared.autoEnableDetectedAgentsIfNeeded()
         updater = UpdaterController.shared
         StatusBarController.shared.start()
-        DefaultPetBootstrap.installIfNeeded()
+        BundledPetBootstrap.installIfNeeded()
         SettingsWindowController.shared.showOnFirstLaunch()
     }
 

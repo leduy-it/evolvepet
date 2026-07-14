@@ -60,6 +60,20 @@ final class PetCareController: ObservableObject {
         return true
     }
 
+    /// The evolution threshold we have already given an "almost there" heads-up for,
+    /// per pet.
+    private var noticedHorizon: [String: Int] = [:]
+
+    /// Claim the right to nudge that `petID` is approaching its evolution at `target`
+    /// — true for the first caller only. Same per-pet, multi-window de-dup as
+    /// `claimEvolutionNotice`, so the nudge is posted once no matter how many windows
+    /// show the pet.
+    func claimHorizonNotice(petID: String, target: Int) -> Bool {
+        guard noticedHorizon[petID] != target else { return false }
+        noticedHorizon[petID] = target
+        return true
+    }
+
     // MARK: - Derived (selected pet)
 
     /// Level shown to the user (pet with no XP reads as Lv 0).
